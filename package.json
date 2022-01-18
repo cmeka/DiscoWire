@@ -1,0 +1,19 @@
+{
+  "name": "DiscoWire",
+  "version": "1.0.0",
+  "description": "SMS/MMS via SignalWire and Discord",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Chris Mekarski",
+  "license": "MIT",
+  "dependencies": {
+    "@discordjs/rest": "^0.2.0-canary.0",
+    "@signalwire/node": "^2.4.0",
+    "discord-api-types": "^0.26.1",
+    "discord.js": "^13.5.1",
+    "dotenv": "^14.2.0",
+    "querystring": "^0.2.1"
+  }
+}
