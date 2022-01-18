@@ -28,7 +28,11 @@ Text Permissions
 
 Create a SignalWire API token with Messaging permissions.
 
-Edit your SignalWire numbers to webhook to this server.
+Edit your SignalWire numbers to webhook to this server either via reverse proxy or port forward:
+
+Ex. "http://EXAMPLE.DOMAIN:PORT/laml"
+
+Use "/laml" as the URL path.
 
 Open .env and insert tokens.
 
