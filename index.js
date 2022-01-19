@@ -12,18 +12,17 @@ discord.on('ready', async () => {
 discord.on('messageCreate', async (message) => {
 	if (process.env.DISCORD_USER_ID && message.author.id != process.env.DISCORD_USER_ID) return;
 
-	if (!message.system && message.channel.type === "GUILD_PUBLIC_THREAD") {
+	if (!message.system && message.type == "DEFAULT" && message.channel.type === "GUILD_PUBLIC_THREAD") {
 		let media = Array.from(message.attachments.values());
 		if (media.length) media = media.map((m) => m.url);
 
 		var ch_from = discord.channels.cache.find( ch => ch.id === message.channel.parentId );
 		var from = normalizePhone(ch_from.name);
 		var to = normalizePhone(message.channel.name);
-		console.log(from, to, message.content, media);
 		sendSms(from, to, message.content, media);
 	}
 });
-discord.login(process.env.DISCORD_TOKEN); // discord token
+discord.login(process.env.DISCORD_TOKEN);
 
 const client = new RelayClient({
 	project: process.env.SIGNALWIRE_PROJECT,
@@ -78,6 +77,7 @@ const server = http.createServer((req, res) => {
 });
 
 async function sendSms(from, to, body, media) {
+	if (!from || !to || !/\d{10}/.test(from) || !/\d{10}/.test(to)) return;
 	let msg = {
 		context: 'discord',
 		from: from,
@@ -86,12 +86,13 @@ async function sendSms(from, to, body, media) {
 	if (body) msg.body = body;
 	if (media) msg.media = media;
 	const sendResult = await client.messaging.send(msg);
-	if (sendResult.successful) console.log('Message ID: ', sendResult.messageId);
+	if (sendResult.successful) console.log('Message sent, ID: ', sendResult.messageId);
 }
 
 function normalizePhone(phone) {
 	if (/^\+/.test(phone)) return phone;
 	phone = phone.replace(/\D/g,'');
+	if (!phone) return false;
 	return '+' + (/^1\d{10}/.test(phone) ? phone : '1' + phone);
 }
 
