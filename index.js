@@ -12,7 +12,7 @@ discord.on('ready', async () => {
 discord.on('messageCreate', async (message) => {
 	if (process.env.DISCORD_USER_ID && message.author.id != process.env.DISCORD_USER_ID) return;
 
-	if (message.channel.type === "GUILD_PUBLIC_THREAD") {
+	if (!message.system && message.channel.type === "GUILD_PUBLIC_THREAD") {
 		let media = Array.from(message.attachments.values());
 		if (media.length) media = media.map((m) => m.url);
 
