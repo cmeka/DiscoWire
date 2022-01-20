@@ -15,9 +15,7 @@ discord.on('messageCreate', async (message) => {
 	if (!message.system && message.type == "DEFAULT" && message.channel.type === "GUILD_PUBLIC_THREAD") {
 		let media = Array.from(message.attachments.values());
 		if (media.length) media = media.map((m) => m.url);
-
-		var ch_from = discord.channels.cache.find( ch => ch.id === message.channel.parentId );
-		var from = normalizePhone(ch_from.name);
+		var from = normalizePhone(message.channel.parent.topic);
 		var to = normalizePhone(message.channel.name);
 		sendSms(from, to, message.content, media);
 	}
@@ -31,14 +29,18 @@ const client = new RelayClient({
 
 async function sendMsg(msg) {
 	var ch_to = discord.channels.cache.find(
-		ch => ch.type === "GUILD_TEXT" && ch.name.replace(/\D/g,'') && (new RegExp( ch.name.replace(/\D/g,'') )).test(msg.To)
+		ch => ch.type === "GUILD_TEXT" && ch.topic.replace(/\D/g,'') && (new RegExp( ch.topic.replace(/\D/g,'') )).test(msg.To)
 	);
+	if (!ch_to) {
+		// TODO create text channel
+		return;
+	}
 	await ch_to.threads.fetchArchived();
 
-	var ch_from = discord.channels.cache.find(
+	var ch_from = ch_to.threads.cache.find(
 		ch => ch.type === "GUILD_PUBLIC_THREAD" && ch.parentId == ch_to.id && ch.name.replace(/\D/g,'') && (new RegExp( ch.name.replace(/\D/g,'') )).test(msg.From)
 	);
-	if (ch_from && ch_from.locked) await ch_from.setArchived(false);
+	if (ch_from && ch_from.archived) await ch_from.setArchived(false);
 
 	var media = [];
 	if (parseInt(msg.NumMedia) > 0) for (let i = 0; i < parseInt(msg.NumMedia); i++) {
