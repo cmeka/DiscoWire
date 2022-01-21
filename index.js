@@ -1,4 +1,4 @@
-var url = require('url');
+const url = require('url');
 const http = require('http');
 const dotenv = require('dotenv');
 const fetch = require('cross-fetch');
@@ -21,9 +21,44 @@ discord.on('messageCreate', async (message) => {
 		sendSms(/signalwire/i.test(message.channel.parent.topic) ? 'signalwire' : 'voipms', from, to, message.content, media);
 	}
 });
-discord.login(process.env.DISCORD_TOKEN);
 
-async function sendMsg(msg) {
+const server = http.createServer(async (req, res) => {
+	if (req.method === 'POST' && req.url === '/signalwire') {
+		collectRequestData(req, result => {
+			console.log(`Message received, ID: ${result.MessageSid}`);
+			sendDiscordMsg(result);
+			res.end('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+		});
+	} else if (req.method === 'GET' && /^\/voipms/.test(req.url)) {
+		var query = url.parse(req.url, true).query;
+		console.log(query);
+		var msg = {'To': query.to, 'From': query.from};
+		var media = [];
+		if (query.message) {
+			msg.Body = query.message;
+		} else {
+			const response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=getMMS`);
+			const data = await response.json();
+			if (data.status === 'success') {
+				let sms = data.sms.find((sms) => sms.id === query.id);
+				if (sms) media = sms.media;
+			}	
+		}
+		for (let i = 0; i < media.length; i++) msg['MediaUrl'+i] = media[i];
+		msg.NumMedia = media.length;
+		sendDiscordMsg(msg);
+	} else {
+		console.log(req.url);
+		res.end();
+	}
+});
+
+async function sendBotMsg(msg) {
+	console.error(msg);
+	await (await discord.users.fetch(process.env.DISCORD_USER_ID)).send(msg);
+}
+
+async function sendDiscordMsg(msg) {
 	var server = discord.guilds.cache.find(ch => ch.id === process.env.DISCORD_SERVER_ID);
 	if (!server) await sendBotMsg(`Server ID not found.`);
 	var ch_to = server.channels.cache.find(
@@ -61,42 +96,6 @@ async function sendMsg(msg) {
 		console.log(`Created thread: ${thread.name}`);
 	}
 }
-
-async function sendBotMsg(msg) {
-	console.error(msg);
-	await (await discord.users.fetch(process.env.DISCORD_USER_ID)).send(msg);
-}
-
-const server = http.createServer(async (req, res) => {
-	if (req.method === 'POST' && req.url === '/signalwire') {
-		collectRequestData(req, result => {
-			console.log(`Message received, ID: ${result.MessageSid}`);
-			sendMsg(result);
-			res.end('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-		});
-	} else if (req.method === 'GET' && /^\/voipms/.test(req.url)) {
-		var query = url.parse(req.url, true).query;
-		console.log(query);
-		var msg = {'To': query.to, 'From': query.from};
-		var media = [];
-		if (query.message) {
-			msg.Body = query.message;
-		} else {
-			const response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=getMMS`);
-			const data = await response.json();
-			if (data.status === 'success') {
-				let sms = data.sms.find((sms) => sms.id === query.id);
-				if (sms) media = sms.media;
-			}	
-		}
-		for (let i = 0; i < media.length; i++) msg['MediaUrl'+i] = media[i];
-		msg.NumMedia = media.length;
-		sendMsg(msg);
-	} else {
-		console.log(req.url);
-		res.end();
-	}
-});
 
 async function sendSms(service, from, to, body, media) {
 	if (!from || !/\d{10}/.test(from)) return await sendBotMsg(`Missing 'From' number in channel topic.`);
@@ -159,4 +158,5 @@ function collectRequestData(request, callback) {
 	}
 }
 
+discord.login(process.env.DISCORD_TOKEN);
 server.listen(process.env.HTTP_PORT);
