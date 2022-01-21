@@ -79,7 +79,9 @@ const server = http.createServer((req, res) => {
 });
 
 async function sendSms(from, to, body, media) {
-	if (!from || !to || !/\d{10}/.test(from) || !/\d{10}/.test(to)) return;
+	if (!from || !/\d{10}/.test(from)) return await sendBotMsg(`Missing 'From' number in channel topic.`);
+	if (!to ||!/\d{10}/.test(to)) return await sendBotMsg(`Missing 'To' number in thread name.`);
+	
 	let msg = {
 		context: 'discord',
 		from: from,
