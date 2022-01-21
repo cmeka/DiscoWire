@@ -1,7 +1,7 @@
 const http = require('http');
 const dotenv = require('dotenv');
+const fetch = require('node-fetch');
 const { parse } = require('querystring');
-const { RelayClient } = require('@signalwire/node');
 const { Client, Intents } = require('discord.js');
 const discord = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 dotenv.config();
@@ -10,7 +10,7 @@ discord.on('ready', async () => {
 	console.log(`Logged in as ${discord.user.tag}!`);
 });
 discord.on('messageCreate', async (message) => {
-	if (process.env.DISCORD_USER_ID && message.author.id != process.env.DISCORD_USER_ID) return;
+	if (process.env.DISCORD_USER_ID && message.author.id !== process.env.DISCORD_USER_ID) return;
 
 	if (!message.system && message.type == "DEFAULT" && message.channel.type === "GUILD_PUBLIC_THREAD") {
 		let media = Array.from(message.attachments.values());
@@ -22,18 +22,15 @@ discord.on('messageCreate', async (message) => {
 });
 discord.login(process.env.DISCORD_TOKEN);
 
-const client = new RelayClient({
-	project: process.env.SIGNALWIRE_PROJECT,
-	token: process.env.SIGNALWIRE_TOKEN
-});
-
 async function sendMsg(msg) {
-	var ch_to = discord.channels.cache.find(
-		ch => ch.type === "GUILD_TEXT" && ch.topic.replace(/\D/g,'') && (new RegExp( ch.topic.replace(/\D/g,'') )).test(msg.To)
+	var server = discord.guilds.cache.find(ch => ch.id === process.env.DISCORD_SERVER_ID);
+	if (!server) await sendBotMsg(`Server ID not found.`);
+	var ch_to = server.channels.cache.find(
+		ch => ch.type === "GUILD_TEXT" && ch.topic && ch.topic.replace(/\D/g,'') && (new RegExp( ch.topic.replace(/\D/g,'') )).test(msg.To)
 	);
 	if (!ch_to) {
-		// TODO create text channel
-		return;
+		ch_to = await server.channels.create(msg.To, { reason: 'New number' });
+		// await sendBotMsg(`Channel for ${msg.To} not found.`);
 	}
 	await ch_to.threads.fetchArchived();
 
@@ -51,7 +48,6 @@ async function sendMsg(msg) {
 	let msg_opts = {};
 	if (msg.Body) msg_opts.content = msg.Body;
 	if (media.length) msg_opts.files = media;
-	console.log(msg_opts);
 
 	if (ch_from) {
 		ch_from.send(msg_opts);
@@ -66,10 +62,14 @@ async function sendMsg(msg) {
 	}
 }
 
+async function sendBotMsg(msg) {
+	await (await discord.users.fetch(process.env.DISCORD_USER_ID)).send(msg);
+}
+
 const server = http.createServer((req, res) => {
 	if (req.method === 'POST' && req.url === '/laml') {
 		collectRequestData(req, result => {
-			console.log(result);
+			console.log(`Message received, ID: ${result.MessageSid}`);
 			sendMsg(result);
 			res.end('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
 		});
@@ -85,10 +85,22 @@ async function sendSms(from, to, body, media) {
 		from: from,
 		to: to
 	};
-	if (body) msg.body = body;
-	if (media) msg.media = media;
-	const sendResult = await client.messaging.send(msg);
-	if (sendResult.successful) console.log('Message sent, ID: ', sendResult.messageId);
+	let params = new URLSearchParams();
+	params.append('From', from);
+	params.append('To', to);
+	
+	if (body) params.append('Body', body);
+	if (media) params.append('MediaUrl', media);
+	
+	const sendResult = await fetch(`https://${process.env.SIGNALWIRE_SPACE}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
+		method: 'POST',
+		headers: {
+			'Authorization': 'Basic ' + Buffer.from(process.env.SIGNALWIRE_PROJECT + ":" + process.env.SIGNALWIRE_TOKEN).toString('base64')
+		},
+		body: params
+	});
+	const data = await sendResult.json();
+	data.error_code ? console.error(data.error_message) : console.log('Message sent, ID: ', data.sid);
 }
 
 function normalizePhone(phone) {
@@ -113,4 +125,3 @@ function collectRequestData(request, callback) {
 }
 
 server.listen(process.env.HTTP_PORT);
-client.connect();

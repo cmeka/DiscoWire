@@ -10,10 +10,10 @@
   "license": "MIT",
   "dependencies": {
     "@discordjs/rest": "^0.2.0-canary.0",
-    "@signalwire/node": "^2.4.0",
     "discord-api-types": "^0.26.1",
     "discord.js": "^13.5.1",
     "dotenv": "^14.2.0",
+    "node-fetch": "2.0",
     "querystring": "^0.2.1"
   }
 }
