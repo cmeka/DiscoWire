@@ -62,6 +62,7 @@ async function sendMsg(msg) {
 }
 
 async function sendBotMsg(msg) {
+	console.error(msg);
 	await (await discord.users.fetch(process.env.DISCORD_USER_ID)).send(msg);
 }
 
@@ -91,15 +92,19 @@ async function sendSms(from, to, body, media) {
 	if (body) params.append('Body', body);
 	if (media) params.append('MediaUrl', media);
 	
-	const sendResult = await fetch(`https://${process.env.SIGNALWIRE_SPACE_URL}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
+	const response = await fetch(`https://${process.env.SIGNALWIRE_SPACE_URL}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
 		method: 'POST',
 		headers: {
 			'Authorization': 'Basic ' + Buffer.from(process.env.SIGNALWIRE_PROJECT + ":" + process.env.SIGNALWIRE_TOKEN).toString('base64')
 		},
 		body: params
 	});
-	const data = await sendResult.json();
-	data.error_code ? console.error(data.error_message) : console.log('Message sent, ID: ', data.sid);
+	if (response.ok || response.status === 422){
+		const data = await response.json();
+		data.error_code || data.message ? sendBotMsg(`Sending SMS Error: ${data.error_message || data.message}`) : console.log('Message sent, ID: ', data.sid);
+	} else {
+		sendBotMsg(`Sending SMS HTTP Error: ${response.status} ${response.statusText}`);
+	}
 }
 
 function normalizePhone(phone) {
