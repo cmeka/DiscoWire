@@ -91,7 +91,7 @@ async function sendSms(from, to, body, media) {
 	if (body) params.append('Body', body);
 	if (media) params.append('MediaUrl', media);
 	
-	const sendResult = await fetch(`https://${process.env.SIGNALWIRE_SPACE}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
+	const sendResult = await fetch(`https://${process.env.SIGNALWIRE_SPACE_URL}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
 		method: 'POST',
 		headers: {
 			'Authorization': 'Basic ' + Buffer.from(process.env.SIGNALWIRE_PROJECT + ":" + process.env.SIGNALWIRE_TOKEN).toString('base64')
