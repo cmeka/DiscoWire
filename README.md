@@ -1,5 +1,5 @@
 # DiscoWire
-A SignalWire SMS/MMS messaging gateway via Discord
+A SignalWire and VoIP.ms SMS/MMS messaging gateway via Discord
 
 # Installation
 git clone https://github.com/cmeka/DiscoWire.git && cd DiscoWire
@@ -7,6 +7,10 @@ git clone https://github.com/cmeka/DiscoWire.git && cd DiscoWire
 npm install
 
 cp .env.example .env
+
+Create a SignalWire API token with Messaging permissions.
+
+Open .env and insert tokens.
 
 Create a Discord server and bot:
 https://discordpy.readthedocs.io/en/stable/discord.html
@@ -26,14 +30,10 @@ Text Permissions
 - Attach Files
 - Read Message History
 
-Create a SignalWire API token with Messaging permissions.
+Edit your SignalWire or VoIP.ms numbers to webhook/URL callback to this server either via reverse proxy or port forward.
 
-Edit your SignalWire numbers to webhook to this server either via reverse proxy or port forward:
+Use the following paths:
 
-Ex. "http://EXAMPLE.DOMAIN:PORT/laml"
-
-Use "/laml" as the URL path.
-
-Open .env and insert tokens.
+Ex. "http://EXAMPLE.DOMAIN:PORT/signalwire" or "http://EXAMPLE.DOMAIN:PORT/voipms?to={TO}&from={FROM}&id={ID}&date={TIMESTAMP}&message={MESSAGE}"
 
 Run: node index.js
