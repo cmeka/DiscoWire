@@ -1,6 +1,6 @@
 const http = require('http');
 const dotenv = require('dotenv');
-const fetch = require('node-fetch');
+const fetch = require('cross-fetch');
 const { parse } = require('querystring');
 const { Client, Intents } = require('discord.js');
 const discord = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
@@ -30,7 +30,6 @@ async function sendMsg(msg) {
 	);
 	if (!ch_to) {
 		ch_to = await server.channels.create(msg.To, { reason: 'New number' });
-		// await sendBotMsg(`Channel for ${msg.To} not found.`);
 	}
 	await ch_to.threads.fetchArchived();
 
