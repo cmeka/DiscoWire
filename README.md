@@ -1,5 +1,5 @@
 # DiscoWire
- SMS/MMS via SignalWire and Discord
+A SignalWire SMS/MMS messaging gateway via Discord
 
 # Installation
 git clone https://github.com/cmeka/DiscoWire.git && cd DiscoWire
@@ -37,7 +37,3 @@ Use "/laml" as the URL path.
 Open .env and insert tokens.
 
 Run: node index.js
-
-
-To do
-- Remove the @signalwire/node dependancy since it's not needed and buggy (unable to close socket connection)
