@@ -16,8 +16,8 @@ discord.on('messageCreate', async (message) => {
 	if (!message.system && message.type == "DEFAULT" && message.channel.type === "GUILD_PUBLIC_THREAD") {
 		let media = Array.from(message.attachments.values());
 		if (media.length) media = media.map((m) => m.url);
-		var from = normalizePhone(message.channel.parent.topic);
-		var to = normalizePhone(message.channel.name);
+		let from = normalizePhone(message.channel.parent.topic);
+		let to = normalizePhone(message.channel.name);
 		sendSms(/signalwire/i.test(message.channel.parent.topic) ? 'signalwire' : 'voipms', from, to, message.content, media);
 	}
 });
@@ -30,13 +30,13 @@ const server = http.createServer(async (req, res) => {
 			res.end('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
 		});
 	} else if (req.method === 'GET' && /^\/voipms/.test(req.url)) {
-		var query = url.parse(req.url, true).query;
+		let query = url.parse(req.url, true).query;
 		console.log(query);
-		var msg = {'To': query.to, 'From': query.from};
-		var media = [];
+		let msg = {'To': query.to, 'From': query.from};
+		let media = [];
 		if (query.message) {
 			msg.Body = query.message;
-		} else {
+		} else { // MMS
 			const response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=getMMS`);
 			const data = await response.json();
 			if (data.status === 'success') {
@@ -59,9 +59,9 @@ async function sendBotMsg(msg) {
 }
 
 async function sendDiscordMsg(msg) {
-	var server = discord.guilds.cache.find(ch => ch.id === process.env.DISCORD_SERVER_ID);
+	let server = discord.guilds.cache.find(ch => ch.id === process.env.DISCORD_SERVER_ID);
 	if (!server) await sendBotMsg(`Server ID not found.`);
-	var ch_to = server.channels.cache.find(
+	let ch_to = server.channels.cache.find(
 		ch => ch.type === "GUILD_TEXT" && ch.topic && ch.topic.replace(/\D/g,'') && (new RegExp( ch.topic.replace(/\D/g,'') )).test(normalizePhone(msg.To))
 	);
 	if (!ch_to) {
@@ -69,14 +69,18 @@ async function sendDiscordMsg(msg) {
 	}
 	await ch_to.threads.fetchArchived();
 
-	var ch_from = ch_to.threads.cache.find(
+	let ch_from = ch_to.threads.cache.find(
 		ch => ch.type === "GUILD_PUBLIC_THREAD" && ch.parentId == ch_to.id && ch.name.replace(/\D/g,'') && (new RegExp( ch.name.replace(/\D/g,'') )).test(normalizePhone(msg.From))
 	);
 	if (ch_from && ch_from.archived) await ch_from.setArchived(false);
 
-	var media = [];
+	let media = [];
 	if (parseInt(msg.NumMedia) > 0) for (let i = 0; i < parseInt(msg.NumMedia); i++) {
-		if (msg['MediaContentType'+i] === 'text/plain') continue;
+		if (msg['MediaContentType'+i] === 'text/plain') {
+			let response = await fetch(msg['MediaUrl'+i]);
+			msg.Body = await response.text();
+			continue;
+		}
 		media.push({ attachment: msg['MediaUrl'+i], name: new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').replace(/\..+/, '') + '_' + i +'.jpg' });
 	}
 
@@ -84,11 +88,13 @@ async function sendDiscordMsg(msg) {
 	if (msg.Body) msg_opts.content = msg.Body;
 	if (media.length) msg_opts.files = media;
 
+	console.log(msg_opts);
+
 	if (ch_from) {
 		ch_from.send(msg_opts);
 	} else {
 		console.log(`Creating new thread for ${msg.From}`);
-		const thread = await ch_to.threads.create({
+		let thread = await ch_to.threads.create({
 			name: msg.From,
 			autoArchiveDuration: 1440
 		});
@@ -107,9 +113,9 @@ async function sendSms(service, from, to, body, media) {
 		params.append('To', to);
 		
 		if (body) params.append('Body', body);
-		if (media) params.append('MediaUrl', media);
+		if (media.length) params.append('MediaUrl', media);
 		
-		const response = await fetch(`https://${process.env.SIGNALWIRE_SPACE_URL}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
+		let response = await fetch(`https://${process.env.SIGNALWIRE_SPACE_URL}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
 			method: 'POST',
 			headers: {
 				'Authorization': 'Basic ' + Buffer.from(process.env.SIGNALWIRE_PROJECT + ":" + process.env.SIGNALWIRE_TOKEN).toString('base64')
@@ -117,7 +123,7 @@ async function sendSms(service, from, to, body, media) {
 			body: params
 		});
 		if (response.ok || response.status === 422) {
-			const data = await response.json();
+			let data = await response.json();
 			data.error_code || data.message ? sendBotMsg(`Sending SMS Error: ${data.error_message || data.message}`) : console.log('Message sent, ID: ', data.sid);
 		} else {
 			sendBotMsg(`Sending SMS HTTP Error: ${response.status} ${response.statusText}`);
@@ -126,11 +132,11 @@ async function sendSms(service, from, to, body, media) {
 		params.append('did', from.replace(/^\+1/, ''));
 		params.append('dst', to.replace(/^\+1/, ''));
 		params.append('message', body ? body : '');
-		if (media) params.append('media1', media);
-		const response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=sendSMS&`+params.toString());
+		if (media.length) params.append('media1', media);
+		let response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=send${media.length ? 'MMS' : 'SMS'}&`+params.toString());
 		if (response.ok) {
 			const data = await response.json();
-			console.log('Message sent, ID: ', data.sms);
+			data.status === 'success' ? console.log('Message sent, ID: ', media.length ? data.mms : data.sms) : sendBotMsg(`Error sending SMS: ${data.status}`);
 		} else {
 			sendBotMsg(`Sending SMS HTTP Error: ${response.status} ${response.statusText}`);
 		}
