@@ -34,15 +34,14 @@ const server = http.createServer(async (req, res) => {
 		console.log(query);
 		let msg = {'To': query.to, 'From': query.from};
 		let media = [];
-		if (query.message) {
-			msg.Body = query.message;
-		} else { // MMS
-			const response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=getMMS`);
+
+		msg.Body = query.message ?? '';
+		try {
+			const response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=getMediaMMS&media_as_array=1&id=${query.id}`);
 			const data = await response.json();
-			if (data.status === 'success') {
-				let sms = data.sms.find((sms) => sms.id === query.id);
-				if (sms) media = sms.media;
-			}	
+			if (data.status === 'success' && data.media) media = data.media;
+		} catch (err) {
+			sendBotMsg(`Error fetching MMS for message ID ${query.id}: ${err.message}`);
 		}
 		for (let i = 0; i < media.length; i++) msg['MediaUrl'+i] = media[i];
 		msg.NumMedia = media.length;
@@ -65,7 +64,7 @@ async function sendDiscordMsg(msg) {
 		ch => ch.type === "GUILD_TEXT" && ch.topic && ch.topic.replace(/\D/g,'') && (new RegExp( ch.topic.replace(/\D/g,'') )).test(normalizePhone(msg.To))
 	);
 	if (!ch_to) {
-		ch_to = await server.channels.create(msg.To, { topic: normalizePhone(msg.To) });
+		ch_to = await server.channels.create(normalizePhone(msg.To), { topic: normalizePhone(msg.To) });
 	}
 	await ch_to.threads.fetchArchived();
 
@@ -87,8 +86,6 @@ async function sendDiscordMsg(msg) {
 	let msg_opts = {};
 	if (msg.Body) msg_opts.content = msg.Body;
 	if (media.length) msg_opts.files = media;
-
-	console.log(msg_opts);
 
 	if (ch_from) {
 		ch_from.send(msg_opts);
@@ -113,7 +110,9 @@ async function sendSms(service, from, to, body, media) {
 		params.append('To', to);
 		
 		if (body) params.append('Body', body);
-		if (media.length) params.append('MediaUrl', media);
+		if (media.length) for (m of media) params.append('MediaUrl', m);
+
+		console.log('SMS params', params);
 		
 		let response = await fetch(`https://${process.env.SIGNALWIRE_SPACE_URL}/api/laml/2010-04-01/Accounts/${process.env.SIGNALWIRE_PROJECT}/Messages.json`, {
 			method: 'POST',
@@ -132,7 +131,7 @@ async function sendSms(service, from, to, body, media) {
 		params.append('did', from.replace(/^\+1/, ''));
 		params.append('dst', to.replace(/^\+1/, ''));
 		params.append('message', body ? body : '');
-		if (media.length) params.append('media1', media);
+		if (media.length) for (let i = 0; i < media.length; i++) params.append('media'+i, media[i]);
 		let response = await fetch(`https://voip.ms/api/v1/rest.php?api_username=${process.env.VOIPMS_USERNAME}&api_password=${process.env.VOIPMS_API_PASS}&method=send${media.length ? 'MMS' : 'SMS'}&`+params.toString());
 		if (response.ok) {
 			const data = await response.json();
